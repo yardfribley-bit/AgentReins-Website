@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AgentReins makes every AI coding agent understandable, verifiable, and trustworthy.">
+  <meta property="og:title" content="AgentReins — See what your AI agents are doing">
+  <meta property="og:description" content="Local-first runtime visibility and security for AI coding agents.">
+  <meta property="og:image" content="https://chuhaijian.com/logo.png">
+  <title>AgentReins — Trust your AI agents</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="grid"></div>
+  <header class="nav shell">
+    <a class="brand" href="/"><img src="/logo.png" alt="AgentReins"><span>AgentReins</span></a>
+    <nav><a href="#product">Product</a><a href="#evidence">Evidence</a><a href="#security">Security</a><a href="/privacy.html">Privacy</a></nav>
+    <a class="button ghost" href="https://github.com/yardfribley-bit/AgentReins">View on GitHub</a>
+  </header>
+
+  <main>
+    <section class="hero shell">
+      <div class="eyebrow"><i></i> Local-first AI agent security for macOS</div>
+      <h1>See what your AI agents are doing.<br><span>Know whether it is safe.</span></h1>
+      <p class="lead">AgentReins turns prompts, model routes, memory access, tool calls, processes, network traffic, and code changes into one evidence-backed live task.</p>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/yardfribley-bit/AgentReins">Get the alpha <b>↗</b></a>
+        <a class="button" href="#product">Explore the live console</a>
+      </div>
+      <div class="trust"><span>● Runs locally</span><span>● Open source</span><span>● Evidence, not guesses</span></div>
+    </section>
+
+    <section id="product" class="console shell">
+      <div class="console-top"><div><span class="live-dot"></span> LIVE OPERATIONS CONSOLE</div><span>3 agents observed · 1 task active</span></div>
+      <div class="console-grid">
+        <aside>
+          <small>AI AGENT FLEET</small>
+          <div class="agent active"><b>WorkBuddy</b><span>Running</span><em>Compiling a local project</em></div>
+          <div class="agent"><b>Codex</b><span>Idle</span><em>Ready for a task</em></div>
+          <div class="agent"><b>Cursor</b><span>Observed</span><em>Latest session available</em></div>
+        </aside>
+        <div class="flow">
+          <small>LIVE TASK · EVIDENCE CHAIN</small>
+          <div class="step done"><i>01</i><div><b>User request</b><span>Create and compile a C program</span></div><time>10:14:03</time></div>
+          <div class="step done"><i>02</i><div><b>Context prepared</b><span>Memory, skills and 14 project files included</span></div><time>10:14:05</time></div>
+          <div class="step warning"><i>03</i><div><b>Model connection</b><span>Private relay → claimed DeepSeek model</span></div><time>10:14:08</time></div>
+          <div class="step running"><i>04</i><div><b>Shell execution</b><span>clang hello.c -o hello</span></div><time>00:07</time></div>
+          <div class="step pending"><i>05</i><div><b>Independent verification</b><span>Waiting for build result</span></div><time>—</time></div>
+        </div>
+        <aside class="verdict">
+          <small>SECURITY VERDICT</small>
+          <div class="score">Review required</div>
+          <ul><li class="ok">Execution is contained</li><li class="warn">Relay identity unverified</li><li class="warn">1 credential exposed upstream</li><li class="ok">No unsafe code finding</li></ul>
+          <div class="coverage"><b>Evidence coverage</b><strong>94%</strong><span><i></i></span></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="evidence" class="section shell">
+      <div class="section-head"><span>ONE TASK. THE COMPLETE STORY.</span><h2>From human intent to machine impact.</h2><p>Follow the causal chain instead of searching disconnected logs.</p></div>
+      <div class="cards">
+        <article><b>01</b><h3>Understand</h3><p>See the request, prepared model context, memory and skills in every turn.</p></article>
+        <article><b>02</b><h3>Trace</h3><p>Connect tools, MCP servers, processes, network destinations and file changes.</p></article>
+        <article><b>03</b><h3>Verify</h3><p>Separate “the agent says done” from results independently proven to work.</p></article>
+      </div>
+    </section>
+
+    <section id="security" class="section dark-band">
+      <div class="shell security-grid">
+        <div><span class="label">MODEL ROUTE SECURITY</span><h2>Know exactly what left your machine.</h2><p>AgentReins identifies the gateway, claimed upstream model, context categories, token volume, and sensitive values found in captured content.</p></div>
+        <div class="route-card">
+          <div><span>Your agent</span><b>68,970 input tokens</b></div><i>→</i><div class="relay"><span>Private relay</span><b>Operator unverified</b></div><i>→</i><div><span>Claimed model</span><b>Identity unproven</b></div>
+          <footer><strong>Exposed:</strong> memory · skills · code · tool results · API credential</footer>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta shell"><img src="/logo.png" alt=""><h2>Make every AI agent understandable,<br>verifiable, and trustworthy.</h2><p>Built in public. Local-first by design.</p><a class="button primary" href="https://github.com/yardfribley-bit/AgentReins">Follow AgentReins on GitHub ↗</a></section>
+  </main>
+  <footer class="footer shell"><span>© 2026 AgentReins</span><span><a href="/privacy.html">Privacy</a> · <a href="https://github.com/yardfribley-bit/AgentReins">GitHub</a></span></footer>
+  <script src="/analytics.js" defer></script>
+</body>
+</html>

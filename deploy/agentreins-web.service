@@ -1,0 +1,19 @@
+[Unit]
+Description=AgentReins website analytics
+After=network.target
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/agentreins-web
+Environment=AGENTREINS_ANALYTICS_DB=/var/lib/agentreins-web/analytics.sqlite3
+ExecStart=/usr/bin/python3 /opt/agentreins-web/server.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/agentreins-web
+[Install]
+WantedBy=multi-user.target
