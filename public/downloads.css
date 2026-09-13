@@ -1,0 +1,9 @@
+.downloads { display:flex; justify-content:center; gap:12px; margin:0 auto 10px; }
+.download { min-width:270px; display:flex; align-items:center; gap:12px; padding:13px 16px; border:1px solid #244b67; border-radius:8px; background:#081b2a; color:#eaf6ff; text-align:left; text-decoration:none; }
+.download:hover { border-color:var(--cyan); background:#0b2234; }
+.download > span:last-child { display:flex; flex-direction:column; gap:3px; }
+.download b { font-size:12px; }
+.download small { color:#7895aa; font-size:9px; }
+.download .apple { color:#eaf6ff; font-size:12px; }
+.release-note { font-size:10px !important; color:#668196 !important; margin:0 0 20px !important; }
+@media (max-width:900px) { .downloads { flex-direction:column; align-items:center; } }

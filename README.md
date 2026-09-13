@@ -2,6 +2,13 @@
 
 The English launch website for AgentReins at `www.chuhaijian.com`.
 
+## Release downloads
+
+Upload notarized builds using these exact paths; the homepage buttons are already wired to them:
+
+- `/opt/agentreins-web/public/downloads/AgentReins-Apple-Silicon.dmg`
+- `/opt/agentreins-web/public/downloads/AgentReins-Intel.dmg`
+
 ## Local preview
 
 ```bash
