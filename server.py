@@ -57,13 +57,15 @@ def classify(ua):
         device = "iPhone"
     elif "Android" in ua:
         model = version(r"Android[^;)]*;\s*(?:[a-z]{2}(?:-[A-Z]{2})?;\s*)?([^;)]+?)(?:\s+Build[/;]|;\s*wv|\))")
-        generic = not model or model.lower() in ("mobile", "tablet")
+        generic = not model or len(model.strip()) <= 2 or model.lower() in ("mobile", "tablet")
         kind = "Android phone" if "Mobile" in ua else "Android tablet"
         device = kind if generic else f"{kind} · {model.strip()}"
     elif "Windows" in ua:
         device = "Windows PC"
     elif "Macintosh" in ua or "Mac OS X" in ua:
         device = "Mac"
+    elif "CrOS" in ua:
+        device = "Chromebook"
     elif "Linux" in ua:
         device = "Linux PC"
     else:
@@ -84,6 +86,9 @@ def classify(ua):
     elif "Mac OS X" in ua:
         value = version(r"Mac OS X ([0-9_]+)")
         os_name = f"macOS {value}" if value else "macOS"
+    elif "CrOS" in ua:
+        value = version(r"CrOS [^ ]+ ([0-9.]+)")
+        os_name = f"ChromeOS {value}" if value else "ChromeOS"
     elif "Ubuntu" in ua:
         os_name = "Ubuntu Linux"
     elif "Linux" in ua:
