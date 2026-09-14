@@ -157,16 +157,47 @@ class Handler(BaseHTTPRequestHandler):
         download_items = [dict(zip(download_keys,row)) for row in downloads]
         for item in visit_items + download_items:
             item["device"], item["os"], item["browser"] = classify(item.get("userAgent") or "")
+
+        # A browser UA alone is not proof of a human. Preview services and security
+        # scanners commonly run full Chrome on Linux, execute JavaScript, and fetch
+        # every download link. Keep their evidence, but do not let it distort the
+        # audience or conversion numbers.
+        activity_by_ip = {}
+        for item in visit_items + download_items:
+            activity_by_ip.setdefault(item["ip"], []).append(item)
+        automated_ips = set()
+        cloud_pattern = re.compile(r"oracle|amazon|google|microsoft|azure|digitalocean|alibaba|tencent|ovh|hetzner", re.I)
+        for ip, activity in activity_by_ip.items():
+            unverified = all(not x.get("visitorId") for x in activity)
+            organization = next((x.get("organization") or "" for x in activity if x.get("organization")), "")
+            paths = {x.get("path") for x in activity if x.get("path")}
+            architectures = {x.get("architecture") for x in activity if x.get("architecture")}
+            times = []
+            for item in activity:
+                try: times.append(datetime.fromisoformat(item["time"]))
+                except (TypeError, ValueError): pass
+            burst = len(times) >= 4 and (max(times) - min(times)).total_seconds() <= 20
+            fetched_every_build = {"Apple Silicon", "Intel"}.issubset(architectures)
+            if unverified and (fetched_every_build or (cloud_pattern.search(organization) and burst and len(paths) >= 2)):
+                automated_ips.add(ip)
         for item in visit_items:
-            item["trafficClass"] = "Bot" if item["device"] == "Bot / crawler" else "Human" if item.get("visitorId") else "Unverified / preview"
+            item["trafficClass"] = ("Bot" if item["device"] == "Bot / crawler" else
+                                    "Likely automated / preview" if item["ip"] in automated_ips else
+                                    "Human" if item.get("visitorId") else "Unverified / preview")
+        for item in download_items:
+            item["trafficClass"] = ("Bot" if item["device"] == "Bot / crawler" else
+                                    "Likely automated / preview" if item["ip"] in automated_ips else
+                                    "Human" if item.get("visitorId") else "Unverified / preview")
         event_keys = ["time","ip","visitorId","sessionId","name","value","path","referrer","userAgent"]
         event_items = [dict(zip(event_keys,row)) for row in events]
-        human_visits = [x for x in visit_items if x["device"] != "Bot / crawler"]
+        human_visits = [x for x in visit_items if x["trafficClass"] in ("Human", "Unverified / preview")]
+        human_downloads = [x for x in download_items if x["trafficClass"] in ("Human", "Unverified / preview")]
         identity = lambda x: x.get("visitorId") or x.get("ip")
         audience = {
           "humanVisitors": len({identity(x) for x in human_visits}),
           "verifiedVisitors": len({x["visitorId"] for x in human_visits if x.get("visitorId")}),
           "sessions": len({x.get("sessionId") or (x["ip"]+x["time"][:13]) for x in human_visits}),
+          "qualifiedDownloads": len(human_downloads),
           "platforms": [], "countries": [], "sources": [], "events": []
         }
         def counts(values):
@@ -186,7 +217,7 @@ class Handler(BaseHTTPRequestHandler):
           {"name":"Viewed product", "count":sum("section_view:product" in es for es in session_events.values())},
           {"name":"GitHub clicks", "count":sum("outbound_click:github" in es for es in session_events.values())},
           {"name":"Download intent", "count":sum("download_click:Apple Silicon" in es or "download_click:Intel" in es for es in session_events.values())},
-          {"name":"Downloads", "count":len({x.get("sessionId") or x["ip"] for x in download_items})}
+          {"name":"Downloads", "count":len({x.get("sessionId") or x["ip"] for x in human_downloads})}
         ]
         data = json.dumps({"summary":dict(zip(["visits","uniqueIPs","downloads","appleSilicon","intel"],summary)),
                            "audience":audience, "visits":visit_items, "downloads":download_items}).encode()
