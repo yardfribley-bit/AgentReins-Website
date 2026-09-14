@@ -12,6 +12,9 @@ def db():
     conn.execute("""CREATE TABLE IF NOT EXISTS visits(id INTEGER PRIMARY KEY, occurred_at TEXT NOT NULL,
       ip TEXT NOT NULL, path TEXT NOT NULL, referrer TEXT, user_agent TEXT, device TEXT, os TEXT,
       browser TEXT, screen TEXT, language TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS downloads(id INTEGER PRIMARY KEY, occurred_at TEXT NOT NULL,
+      ip TEXT NOT NULL, architecture TEXT NOT NULL, referrer TEXT, user_agent TEXT, device TEXT,
+      os TEXT, browser TEXT)""")
     return conn
 
 def classify(ua):
@@ -22,11 +25,23 @@ def classify(ua):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path != "/api/admin/visits": return self.send_error(404)
+        if self.path in ("/download/apple-silicon", "/download/intel"):
+            architecture = "Apple Silicon" if self.path.endswith("apple-silicon") else "Intel"
+            ua = self.headers.get("user-agent", "")[:512]
+            device, os_name, browser = classify(ua)
+            ip = (self.headers.get("x-real-ip") or self.client_address[0])[:64]
+            with db() as conn:
+                conn.execute("INSERT INTO downloads(occurred_at,ip,architecture,referrer,user_agent,device,os,browser) VALUES(?,?,?,?,?,?,?,?)",
+                    (datetime.now(timezone.utc).isoformat(), ip, architecture, self.headers.get("referer", "")[:1024], ua, device, os_name, browser))
+            filename = "AgentReins-Apple-Silicon.dmg" if architecture == "Apple Silicon" else "AgentReins-Intel.dmg"
+            self.send_response(302); self.send_header("Location", f"/downloads/{filename}"); self.send_header("Cache-Control", "no-store"); self.end_headers(); return
+        if self.path != "/api/admin/stats": return self.send_error(404)
         with db() as conn:
-            rows = conn.execute("SELECT occurred_at,ip,path,referrer,device,os,browser,screen,language FROM visits ORDER BY id DESC LIMIT 500").fetchall()
-        keys = ["time","ip","path","referrer","device","os","browser","screen","language"]
-        data = json.dumps([dict(zip(keys, row)) for row in rows]).encode()
+            visits = conn.execute("SELECT occurred_at,ip,path,referrer,device,os,browser,screen,language FROM visits ORDER BY id DESC LIMIT 500").fetchall()
+            downloads = conn.execute("SELECT occurred_at,ip,architecture,referrer,device,os,browser FROM downloads ORDER BY id DESC LIMIT 500").fetchall()
+        visit_keys = ["time","ip","path","referrer","device","os","browser","screen","language"]
+        download_keys = ["time","ip","architecture","referrer","device","os","browser"]
+        data = json.dumps({"visits":[dict(zip(visit_keys,row)) for row in visits], "downloads":[dict(zip(download_keys,row)) for row in downloads]}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(data)
 
     def do_POST(self):
