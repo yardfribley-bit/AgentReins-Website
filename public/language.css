@@ -1,0 +1,4 @@
+.nav-actions { display: flex; align-items: center; gap: 12px; }
+.language { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; padding: 9px 12px; border: 1px solid #285071; border-radius: 8px; color: #bcd3e2; background: #091b2a; font-size: 13px; font-weight: 700; text-decoration: none; }
+.language:hover { border-color: var(--cyan); color: white; }
+@media (max-width: 620px) { .nav-actions .button { display: none; } }

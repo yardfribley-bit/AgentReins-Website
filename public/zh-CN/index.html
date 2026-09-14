@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AgentReins 让每个人都能看懂、验证并信任自己的 AI Agent。">
+  <meta property="og:title" content="AgentReins — 看清你的 AI Agent 正在做什么">
+  <meta property="og:description" content="面向 AI 编程 Agent 的本地优先运行态势与安全平台。">
+  <meta property="og:image" content="https://chuhaijian.com/logo.png">
+  <link rel="alternate" hreflang="en" href="https://www.chuhaijian.com/">
+  <link rel="alternate" hreflang="zh-CN" href="https://www.chuhaijian.com/zh-CN/">
+  <title>AgentReins — 信任你的 AI Agent</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/language.css">
+  <link rel="stylesheet" href="/downloads.css">
+</head>
+<body>
+  <div class="grid"></div>
+  <header class="nav shell">
+    <a class="brand" href="/zh-CN/"><img src="/logo.png" alt="AgentReins"><span>AgentReins</span></a>
+    <nav><a href="#product">产品</a><a href="#evidence">证据</a><a href="#security">安全</a><a href="/zh-CN/privacy.html">隐私</a></nav>
+    <div class="nav-actions"><a class="language" href="/" data-language="en" lang="en">EN</a><a class="button ghost" href="https://github.com/yardfribley-bit/AgentReins">在 GitHub 查看</a></div>
+  </header>
+  <main>
+    <section class="hero shell">
+      <div class="eyebrow"><i></i> 面向 macOS 的本地优先 AI Agent 安全平台</div>
+      <h1>看清你的 AI Agent 正在做什么。<br><span>知道它是否安全。</span></h1>
+      <p class="lead">AgentReins 将提示词、模型路由、记忆访问、工具调用、进程、网络流量和代码变更，串联成一条有原始证据支撑的实时任务链。</p>
+      <div class="actions"><a class="button primary" href="https://github.com/yardfribley-bit/AgentReins">获取 Alpha 版本 <b>↗</b></a><a class="button" href="#product">查看实时控制台</a></div>
+      <div class="downloads" aria-label="AgentReins 下载">
+        <a class="download" href="/download/apple-silicon"><span class="apple">●</span><span><b>下载 Apple 芯片版</b><small>M1、M2、M3、M4 · macOS 13+</small></span></a>
+        <a class="download" href="/download/intel"><span class="apple">●</span><span><b>下载 Intel 芯片版</b><small>Intel 处理器 · macOS 13+</small></span></a>
+      </div>
+      <p class="release-note">版本 1.1.0 · Developer ID 签名 · Apple 公证</p>
+      <div class="trust"><span>● 本机运行</span><span>● 开源</span><span>● 基于证据，而非猜测</span></div>
+    </section>
+    <section id="product" class="console shell">
+      <div class="console-top"><div><span class="live-dot"></span> 实时运行态势</div><span>已发现 3 个 Agent · 1 个任务正在执行</span></div>
+      <div class="console-grid">
+        <aside><small>AI AGENT 列表</small><div class="agent active"><b>WorkBuddy</b><span>运行中</span><em>正在编译本地项目</em></div><div class="agent"><b>Codex</b><span>空闲</span><em>等待新任务</em></div><div class="agent"><b>Cursor</b><span>已发现</span><em>可查看最近会话</em></div></aside>
+        <div class="flow"><small>实时任务 · 证据链</small><div class="step done"><i>01</i><div><b>用户需求</b><span>创建并编译一个 C 程序</span></div><time>10:14:03</time></div><div class="step done"><i>02</i><div><b>上下文已准备</b><span>包含记忆、Skill 和 14 个项目文件</span></div><time>10:14:05</time></div><div class="step warning"><i>03</i><div><b>模型连接</b><span>私人中转 → 声称为 DeepSeek 模型</span></div><time>10:14:08</time></div><div class="step running"><i>04</i><div><b>Shell 执行</b><span>clang hello.c -o hello</span></div><time>00:07</time></div><div class="step pending"><i>05</i><div><b>独立验证</b><span>等待编译结果</span></div><time>—</time></div></div>
+        <aside class="verdict"><small>安全结论</small><div class="score">需要检查</div><ul><li class="ok">执行环境受控</li><li class="warn">中转身份尚未验证</li><li class="warn">1 个凭据被发送到上游</li><li class="ok">未发现不安全代码</li></ul><div class="coverage"><b>证据覆盖率</b><strong>94%</strong><span><i></i></span></div></aside>
+      </div>
+    </section>
+    <section id="evidence" class="section shell"><div class="section-head"><span>一个任务，完整故事</span><h2>从人的意图，到机器产生的影响。</h2><p>沿着因果链理解任务，不再翻找彼此割裂的日志。</p></div><div class="cards"><article><b>01</b><h3>看懂</h3><p>查看每轮用户需求、模型上下文、记忆和 Skill。</p></article><article><b>02</b><h3>追踪</h3><p>关联工具、MCP、进程、网络目标和文件变更。</p></article><article><b>03</b><h3>验证</h3><p>区分“Agent 声称完成”和经过独立验证的真实结果。</p></article></div></section>
+    <section id="security" class="section dark-band"><div class="shell security-grid"><div><span class="label">模型路由安全</span><h2>明确知道哪些数据离开了你的电脑。</h2><p>AgentReins 识别网关、声称的上游模型、上下文类别、Token 规模，以及捕获内容中存在的敏感值。</p></div><div class="route-card"><div><span>你的 Agent</span><b>68,970 输入 Token</b></div><i>→</i><div class="relay"><span>私人中转</span><b>运营方未验证</b></div><i>→</i><div><span>声称的模型</span><b>身份无法证明</b></div><footer><strong>已暴露：</strong>记忆 · Skill · 代码 · 工具结果 · API 凭据</footer></div></div></section>
+    <section class="cta shell"><img src="/logo.png" alt=""><h2>让每个人都能看懂、验证<br>并信任自己的 AI Agent。</h2><p>公开构建，本地优先。</p><a class="button primary" href="https://github.com/yardfribley-bit/AgentReins">在 GitHub 关注 AgentReins ↗</a></section>
+  </main>
+  <footer class="footer shell"><span>© 2026 AgentReins</span><span><a href="mailto:yardfribley@gmail.com">邮箱</a> · <a href="https://x.com/agentreins">X</a> · <a href="/zh-CN/privacy.html">隐私</a> · <a href="https://github.com/yardfribley-bit/AgentReins">GitHub</a></span></footer>
+  <script src="/analytics.js" defer></script><script src="/language.js" defer></script>
+</body></html>
