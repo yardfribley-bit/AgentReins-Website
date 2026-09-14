@@ -17,7 +17,19 @@ def db():
       os TEXT, browser TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS geo_cache(ip TEXT PRIMARY KEY, country TEXT, region TEXT,
       city TEXT, asn TEXT, organization TEXT, updated_at TEXT NOT NULL)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS behavior_events(id INTEGER PRIMARY KEY, occurred_at TEXT NOT NULL,
+      ip TEXT NOT NULL, visitor_id TEXT, session_id TEXT, event_name TEXT NOT NULL, event_value TEXT,
+      path TEXT, referrer TEXT, user_agent TEXT)""")
+    for table, column in (("visits", "visitor_id TEXT"), ("visits", "session_id TEXT"),
+                          ("downloads", "visitor_id TEXT"), ("downloads", "session_id TEXT")):
+        name = column.split()[0]
+        if name not in {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column}")
     return conn
+
+def safe_id(value):
+    value = str(value or "")[:80]
+    return value if re.fullmatch(r"[A-Za-z0-9._:-]+", value) else ""
 
 def enrich_ip(value):
     try:
@@ -109,52 +121,99 @@ def classify(ua):
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path in ("/download/apple-silicon", "/download/intel"):
-            architecture = "Apple Silicon" if self.path.endswith("apple-silicon") else "Intel"
+        parsed = urllib.parse.urlsplit(self.path)
+        path = parsed.path
+        if path in ("/download/apple-silicon", "/download/intel"):
+            architecture = "Apple Silicon" if path.endswith("apple-silicon") else "Intel"
+            query = urllib.parse.parse_qs(parsed.query)
+            visitor_id, session_id = safe_id((query.get("vid") or [""])[0]), safe_id((query.get("sid") or [""])[0])
             ua = self.headers.get("user-agent", "")[:512]
             device, os_name, browser = classify(ua)
             ip = (self.headers.get("x-real-ip") or self.client_address[0])[:64]
             with db() as conn:
                 conn.execute("DELETE FROM downloads WHERE occurred_at < ?", ((datetime.now(timezone.utc)-timedelta(days=30)).isoformat(),))
-                conn.execute("INSERT INTO downloads(occurred_at,ip,architecture,referrer,user_agent,device,os,browser) VALUES(?,?,?,?,?,?,?,?)",
-                    (datetime.now(timezone.utc).isoformat(), ip, architecture, self.headers.get("referer", "")[:1024], ua, device, os_name, browser))
+                conn.execute("INSERT INTO downloads(occurred_at,ip,architecture,referrer,user_agent,device,os,browser,visitor_id,session_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (datetime.now(timezone.utc).isoformat(), ip, architecture, self.headers.get("referer", "")[:1024], ua, device, os_name, browser, visitor_id, session_id))
             enrich_later(ip)
             filename = "AgentReins-Apple-Silicon.dmg" if architecture == "Apple Silicon" else "AgentReins-Intel.dmg"
             self.send_response(302); self.send_header("Location", f"/downloads/{filename}"); self.send_header("Cache-Control", "no-store"); self.end_headers(); return
-        if self.path != "/api/admin/stats": return self.send_error(404)
+        if path != "/api/admin/stats": return self.send_error(404)
         with db() as conn:
-            visits = conn.execute("""SELECT v.occurred_at,v.ip,v.path,v.referrer,v.device,v.os,v.browser,v.user_agent,v.screen,v.language,
+            visits = conn.execute("""SELECT v.occurred_at,v.ip,v.path,v.referrer,v.device,v.os,v.browser,v.user_agent,v.screen,v.language,v.visitor_id,v.session_id,
               g.country,g.region,g.city,g.asn,g.organization FROM visits v LEFT JOIN geo_cache g ON g.ip=v.ip ORDER BY v.id DESC LIMIT 500""").fetchall()
-            downloads = conn.execute("""SELECT d.occurred_at,d.ip,d.architecture,d.referrer,d.device,d.os,d.browser,d.user_agent,
+            downloads = conn.execute("""SELECT d.occurred_at,d.ip,d.architecture,d.referrer,d.device,d.os,d.browser,d.user_agent,d.visitor_id,d.session_id,
               g.country,g.region,g.city,g.asn,g.organization FROM downloads d LEFT JOIN geo_cache g ON g.ip=d.ip ORDER BY d.id DESC LIMIT 500""").fetchall()
+            events = conn.execute("""SELECT occurred_at,ip,visitor_id,session_id,event_name,event_value,path,referrer,user_agent
+              FROM behavior_events ORDER BY id DESC LIMIT 5000""").fetchall()
             summary = conn.execute("""SELECT
               (SELECT count(*) FROM visits),
               (SELECT count(DISTINCT ip) FROM (SELECT ip FROM visits UNION ALL SELECT ip FROM downloads)),
               (SELECT count(*) FROM downloads),
               (SELECT count(*) FROM downloads WHERE architecture='Apple Silicon'),
               (SELECT count(*) FROM downloads WHERE architecture='Intel')""").fetchone()
-        visit_keys = ["time","ip","path","referrer","device","os","browser","userAgent","screen","language","country","region","city","asn","organization"]
-        download_keys = ["time","ip","architecture","referrer","device","os","browser","userAgent","country","region","city","asn","organization"]
+        visit_keys = ["time","ip","path","referrer","device","os","browser","userAgent","screen","language","visitorId","sessionId","country","region","city","asn","organization"]
+        download_keys = ["time","ip","architecture","referrer","device","os","browser","userAgent","visitorId","sessionId","country","region","city","asn","organization"]
         visit_items = [dict(zip(visit_keys,row)) for row in visits]
         download_items = [dict(zip(download_keys,row)) for row in downloads]
         for item in visit_items + download_items:
             item["device"], item["os"], item["browser"] = classify(item.get("userAgent") or "")
+        for item in visit_items:
+            item["trafficClass"] = "Bot" if item["device"] == "Bot / crawler" else "Human" if item.get("visitorId") else "Unverified / preview"
+        event_keys = ["time","ip","visitorId","sessionId","name","value","path","referrer","userAgent"]
+        event_items = [dict(zip(event_keys,row)) for row in events]
+        human_visits = [x for x in visit_items if x["device"] != "Bot / crawler"]
+        identity = lambda x: x.get("visitorId") or x.get("ip")
+        audience = {
+          "humanVisitors": len({identity(x) for x in human_visits}),
+          "verifiedVisitors": len({x["visitorId"] for x in human_visits if x.get("visitorId")}),
+          "sessions": len({x.get("sessionId") or (x["ip"]+x["time"][:13]) for x in human_visits}),
+          "platforms": [], "countries": [], "sources": [], "events": []
+        }
+        def counts(values):
+            result = {}
+            for value in values: result[value or "Unknown"] = result.get(value or "Unknown", 0) + 1
+            return [{"name":k,"count":v} for k,v in sorted(result.items(), key=lambda p:(-p[1],p[0]))]
+        audience["platforms"] = counts(x["device"].split(" · ")[0] for x in human_visits)
+        audience["countries"] = counts(x.get("country") for x in human_visits)
+        audience["sources"] = counts((urllib.parse.urlsplit(x.get("referrer") or "").hostname or "Direct") for x in human_visits)
+        audience["events"] = counts(x["name"] for x in event_items)
+        session_events = {}
+        for x in event_items:
+            session_events.setdefault(x.get("sessionId") or "", set()).add(x["name"] + (":" + (x.get("value") or "")))
+        audience["funnel"] = [
+          {"name":"Sessions", "count":audience["sessions"]},
+          {"name":"Engaged 30s", "count":sum(any(e.startswith("engaged_30s") for e in es) for es in session_events.values())},
+          {"name":"Viewed product", "count":sum("section_view:product" in es for es in session_events.values())},
+          {"name":"GitHub clicks", "count":sum("outbound_click:github" in es for es in session_events.values())},
+          {"name":"Download intent", "count":sum("download_click:Apple Silicon" in es or "download_click:Intel" in es for es in session_events.values())},
+          {"name":"Downloads", "count":len({x.get("sessionId") or x["ip"] for x in download_items})}
+        ]
         data = json.dumps({"summary":dict(zip(["visits","uniqueIPs","downloads","appleSilicon","intel"],summary)),
-                           "visits":visit_items, "downloads":download_items}).encode()
+                           "audience":audience, "visits":visit_items, "downloads":download_items}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(data)
 
     def do_POST(self):
-        if self.path != "/api/visit": return self.send_error(404)
+        path = urllib.parse.urlsplit(self.path).path
+        if path not in ("/api/visit", "/api/event"): return self.send_error(404)
         try:
             length = min(int(self.headers.get("content-length", "0")), 4096)
             body = json.loads(self.rfile.read(length) or b"{}")
             ua = self.headers.get("user-agent", "")[:512]
             device, os_name, browser = classify(ua)
             ip = (self.headers.get("x-real-ip") or self.client_address[0])[:64]
+            visitor_id, session_id = safe_id(body.get("visitorId")), safe_id(body.get("sessionId"))
             with db() as conn:
-                conn.execute("DELETE FROM visits WHERE occurred_at < ?", ((datetime.now(timezone.utc)-timedelta(days=30)).isoformat(),))
-                conn.execute("INSERT INTO visits(occurred_at,ip,path,referrer,user_agent,device,os,browser,screen,language) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (datetime.now(timezone.utc).isoformat(), ip, str(body.get("path","/"))[:512], str(body.get("referrer") or "")[:1024], ua, device, os_name, browser, str(body.get("screen") or "")[:32], str(body.get("language") or "")[:32]))
+                cutoff = (datetime.now(timezone.utc)-timedelta(days=30)).isoformat()
+                conn.execute("DELETE FROM visits WHERE occurred_at < ?", (cutoff,))
+                conn.execute("DELETE FROM behavior_events WHERE occurred_at < ?", (cutoff,))
+                if path == "/api/visit":
+                    conn.execute("INSERT INTO visits(occurred_at,ip,path,referrer,user_agent,device,os,browser,screen,language,visitor_id,session_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (datetime.now(timezone.utc).isoformat(), ip, str(body.get("path","/"))[:512], str(body.get("referrer") or "")[:1024], ua, device, os_name, browser, str(body.get("screen") or "")[:32], str(body.get("language") or "")[:32], visitor_id, session_id))
+                else:
+                    event_name = str(body.get("name") or "")[:64]
+                    if event_name:
+                        conn.execute("INSERT INTO behavior_events(occurred_at,ip,visitor_id,session_id,event_name,event_value,path,referrer,user_agent) VALUES(?,?,?,?,?,?,?,?,?)",
+                            (datetime.now(timezone.utc).isoformat(), ip, visitor_id, session_id, event_name, str(body.get("value") or "")[:256], str(body.get("path") or "/")[:512], str(body.get("referrer") or "")[:1024], ua))
             enrich_later(ip)
             self.send_response(204); self.end_headers()
         except Exception:
