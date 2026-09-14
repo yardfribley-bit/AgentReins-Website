@@ -45,9 +45,61 @@ def backfill_geo():
     for value in values: enrich_ip(value)
 
 def classify(ua):
-    device = "Mobile" if re.search(r"Mobile|Android|iPhone", ua, re.I) else "Tablet" if re.search(r"iPad|Tablet", ua, re.I) else "Desktop"
-    os_name = next((name for token,name in [("Windows","Windows"),("Mac OS X","macOS"),("iPhone","iOS"),("Android","Android"),("Linux","Linux")] if token in ua), "Other")
-    browser = "Edge" if "Edg/" in ua else "Chrome" if "Chrome/" in ua else "Firefox" if "Firefox/" in ua else "Safari" if "Safari/" in ua else "Other"
+    def version(pattern):
+        match = re.search(pattern, ua, re.I)
+        return match.group(1).replace("_", ".") if match else ""
+
+    if re.search(r"bot|crawler|spider|slurp|headless", ua, re.I):
+        device = "Bot / crawler"
+    elif "iPad" in ua:
+        device = "iPad"
+    elif "iPhone" in ua:
+        device = "iPhone"
+    elif "Android" in ua:
+        model = version(r"Android[^;)]*;\s*(?:[a-z]{2}(?:-[A-Z]{2})?;\s*)?([^;)]+?)(?:\s+Build[/;]|;\s*wv|\))")
+        generic = not model or model.lower() in ("mobile", "tablet")
+        kind = "Android phone" if "Mobile" in ua else "Android tablet"
+        device = kind if generic else f"{kind} · {model.strip()}"
+    elif "Windows" in ua:
+        device = "Windows PC"
+    elif "Macintosh" in ua or "Mac OS X" in ua:
+        device = "Mac"
+    elif "Linux" in ua:
+        device = "Linux PC"
+    else:
+        device = "Unknown device"
+
+    if "Windows" in ua:
+        nt = version(r"Windows NT ([0-9.]+)")
+        os_name = {"10.0":"Windows 10/11","6.3":"Windows 8.1","6.2":"Windows 8","6.1":"Windows 7"}.get(nt, f"Windows NT {nt}" if nt else "Windows")
+    elif "iPhone" in ua:
+        value = version(r"(?:CPU )?iPhone OS ([0-9_]+)")
+        os_name = f"iOS {value}" if value else "iOS"
+    elif "iPad" in ua:
+        value = version(r"CPU OS ([0-9_]+)")
+        os_name = f"iPadOS {value}" if value else "iPadOS"
+    elif "Android" in ua:
+        value = version(r"Android ([0-9.]+)")
+        os_name = f"Android {value}" if value else "Android"
+    elif "Mac OS X" in ua:
+        value = version(r"Mac OS X ([0-9_]+)")
+        os_name = f"macOS {value}" if value else "macOS"
+    elif "Ubuntu" in ua:
+        os_name = "Ubuntu Linux"
+    elif "Linux" in ua:
+        os_name = "Linux"
+    else:
+        os_name = "Unknown OS"
+
+    candidates = [("Edge", r"(?:Edg|EdgA|EdgiOS)/([0-9.]+)"), ("Samsung Internet", r"SamsungBrowser/([0-9.]+)"),
+                  ("Opera", r"(?:OPR|Opera)/([0-9.]+)"), ("Chrome", r"(?:Chrome|CriOS)/([0-9.]+)"),
+                  ("Firefox", r"(?:Firefox|FxiOS)/([0-9.]+)"), ("Safari", r"Version/([0-9.]+).+Safari/")]
+    browser = "Other browser"
+    for name, pattern in candidates:
+        value = version(pattern)
+        if value:
+            browser = f"{name} {value}"
+            break
     return device, os_name, browser
 
 class Handler(BaseHTTPRequestHandler):
@@ -66,9 +118,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(302); self.send_header("Location", f"/downloads/{filename}"); self.send_header("Cache-Control", "no-store"); self.end_headers(); return
         if self.path != "/api/admin/stats": return self.send_error(404)
         with db() as conn:
-            visits = conn.execute("""SELECT v.occurred_at,v.ip,v.path,v.referrer,v.device,v.os,v.browser,v.screen,v.language,
+            visits = conn.execute("""SELECT v.occurred_at,v.ip,v.path,v.referrer,v.device,v.os,v.browser,v.user_agent,v.screen,v.language,
               g.country,g.region,g.city,g.asn,g.organization FROM visits v LEFT JOIN geo_cache g ON g.ip=v.ip ORDER BY v.id DESC LIMIT 500""").fetchall()
-            downloads = conn.execute("""SELECT d.occurred_at,d.ip,d.architecture,d.referrer,d.device,d.os,d.browser,
+            downloads = conn.execute("""SELECT d.occurred_at,d.ip,d.architecture,d.referrer,d.device,d.os,d.browser,d.user_agent,
               g.country,g.region,g.city,g.asn,g.organization FROM downloads d LEFT JOIN geo_cache g ON g.ip=d.ip ORDER BY d.id DESC LIMIT 500""").fetchall()
             summary = conn.execute("""SELECT
               (SELECT count(*) FROM visits),
@@ -76,11 +128,14 @@ class Handler(BaseHTTPRequestHandler):
               (SELECT count(*) FROM downloads),
               (SELECT count(*) FROM downloads WHERE architecture='Apple Silicon'),
               (SELECT count(*) FROM downloads WHERE architecture='Intel')""").fetchone()
-        visit_keys = ["time","ip","path","referrer","device","os","browser","screen","language","country","region","city","asn","organization"]
-        download_keys = ["time","ip","architecture","referrer","device","os","browser","country","region","city","asn","organization"]
+        visit_keys = ["time","ip","path","referrer","device","os","browser","userAgent","screen","language","country","region","city","asn","organization"]
+        download_keys = ["time","ip","architecture","referrer","device","os","browser","userAgent","country","region","city","asn","organization"]
+        visit_items = [dict(zip(visit_keys,row)) for row in visits]
+        download_items = [dict(zip(download_keys,row)) for row in downloads]
+        for item in visit_items + download_items:
+            item["device"], item["os"], item["browser"] = classify(item.get("userAgent") or "")
         data = json.dumps({"summary":dict(zip(["visits","uniqueIPs","downloads","appleSilicon","intel"],summary)),
-                           "visits":[dict(zip(visit_keys,row)) for row in visits],
-                           "downloads":[dict(zip(download_keys,row)) for row in downloads]}).encode()
+                           "visits":visit_items, "downloads":download_items}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(data)
 
     def do_POST(self):
