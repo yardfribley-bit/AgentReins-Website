@@ -31,6 +31,7 @@ class Handler(BaseHTTPRequestHandler):
             device, os_name, browser = classify(ua)
             ip = (self.headers.get("x-real-ip") or self.client_address[0])[:64]
             with db() as conn:
+                conn.execute("DELETE FROM downloads WHERE occurred_at < ?", ((datetime.now(timezone.utc)-timedelta(days=30)).isoformat(),))
                 conn.execute("INSERT INTO downloads(occurred_at,ip,architecture,referrer,user_agent,device,os,browser) VALUES(?,?,?,?,?,?,?,?)",
                     (datetime.now(timezone.utc).isoformat(), ip, architecture, self.headers.get("referer", "")[:1024], ua, device, os_name, browser))
             filename = "AgentReins-Apple-Silicon.dmg" if architecture == "Apple Silicon" else "AgentReins-Intel.dmg"
@@ -39,9 +40,17 @@ class Handler(BaseHTTPRequestHandler):
         with db() as conn:
             visits = conn.execute("SELECT occurred_at,ip,path,referrer,device,os,browser,screen,language FROM visits ORDER BY id DESC LIMIT 500").fetchall()
             downloads = conn.execute("SELECT occurred_at,ip,architecture,referrer,device,os,browser FROM downloads ORDER BY id DESC LIMIT 500").fetchall()
+            summary = conn.execute("""SELECT
+              (SELECT count(*) FROM visits),
+              (SELECT count(DISTINCT ip) FROM (SELECT ip FROM visits UNION ALL SELECT ip FROM downloads)),
+              (SELECT count(*) FROM downloads),
+              (SELECT count(*) FROM downloads WHERE architecture='Apple Silicon'),
+              (SELECT count(*) FROM downloads WHERE architecture='Intel')""").fetchone()
         visit_keys = ["time","ip","path","referrer","device","os","browser","screen","language"]
         download_keys = ["time","ip","architecture","referrer","device","os","browser"]
-        data = json.dumps({"visits":[dict(zip(visit_keys,row)) for row in visits], "downloads":[dict(zip(download_keys,row)) for row in downloads]}).encode()
+        data = json.dumps({"summary":dict(zip(["visits","uniqueIPs","downloads","appleSilicon","intel"],summary)),
+                           "visits":[dict(zip(visit_keys,row)) for row in visits],
+                           "downloads":[dict(zip(download_keys,row)) for row in downloads]}).encode()
         self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(data)
 
     def do_POST(self):
