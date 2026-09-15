@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AgentReins Linux Security Intelligence — 腾讯云主机运行态安全解析。">
+  <meta name="robots" content="noindex,nofollow">
+  <title>AgentReins Linux Security Intelligence</title>
+  <link rel="stylesheet" href="/agentsec/agentsec.css">
+  <link rel="stylesheet" href="/agentsec/stream.css">
+</head>
+<body>
+  <div class="ambient"></div>
+  <header class="topbar">
+    <a class="brand" href="/"><img src="/logo.png" alt="AgentReins"><span>AgentReins</span></a>
+    <div class="product"><b>Linux Security Intelligence</b><span>HOST RUNTIME ANALYSIS</span></div>
+    <div class="live"><i></i><span id="feed-state">正在读取安全证据</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="kicker">PROTECTED ASSET · TENCENT CLOUD CVM</p>
+        <h1>主机行为，现在有据可查。</h1>
+        <p class="intro">持续解析 Tencent Agent 的进程血缘、命令执行、文件访问、内核能力与网络传播。每个结论都保留证据来源和可信度。</p>
+      </div>
+      <div class="host-identity">
+        <span>受保护主机</span><strong id="hostname">—</strong>
+        <small id="host-meta">—</small>
+        <time id="observed-at">—</time>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="主机安全指标">
+      <article><span>受监控组件</span><strong id="agent-count">—</strong><small>腾讯云运行组件</small></article>
+      <article><span>捕获执行事件</span><strong id="exec-count">—</strong><small>当前观测窗口</small></article>
+      <article><span>网络事件</span><strong id="network-count">—</strong><small>已确认进程归属</small></article>
+      <article class="danger"><span>根分区使用率</span><strong id="disk-percent">—</strong><small id="disk-detail">需要关注</small></article>
+      <article><span>证据覆盖</span><strong id="coverage">—</strong><small>Process · File · Network · Capability</small></article>
+    </section>
+
+    <section class="workspace">
+      <aside class="panel agents-panel">
+        <div class="panel-head"><div><span>ENTITY INVENTORY</span><h2>Tencent Agent 资产</h2></div><b id="agent-running">—</b></div>
+        <div id="agent-list" class="agent-list"></div>
+      </aside>
+
+      <section class="panel timeline-panel">
+        <div class="panel-head"><div><span>LIVE KERNEL + CONTROL PLANE EVIDENCE</span><h2>完整行为时间线</h2></div><div class="legend"><i></i> 2 秒增量</div></div>
+        <div id="command-list" class="command-list"></div>
+      </section>
+
+      <aside class="panel posture-panel">
+        <div class="panel-head"><div><span>SECURITY POSTURE</span><h2>风险面</h2></div></div>
+        <div class="risk-score"><span>需要持续观察</span><strong>高权限</strong></div>
+        <ul id="findings"></ul>
+        <div class="sensor">
+          <div><span>KubeArmor</span><b id="sensor-state">—</b></div>
+          <div><span>LSM</span><b id="lsm">—</b></div>
+          <div><span>模式</span><b id="mode">—</b></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel case-panel">
+      <div class="panel-head"><div><span>END-TO-END PROVEN CASE · invt-k81jin0r4m</span><h2>Tencent TAT 远程命令全过程</h2></div><div class="legend"><i></i> 原始证据关联</div></div>
+      <div id="case-chain" class="command-list"><article class="command">正在加载任务全过程…</article></div>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel network-panel">
+        <div class="panel-head"><div><span>NETWORK PROPAGATION</span><h2>网络传播与载荷关联</h2></div><small>连接证据 + Agent 应用日志中的指令/上报正文</small></div>
+        <div id="network-list" class="network-list"></div>
+      </article>
+      <article class="panel evidence-panel">
+        <div class="panel-head"><div><span>EVIDENCE CONFIDENCE</span><h2>我们知道什么</h2></div></div>
+        <div class="confidence confirmed"><b>已确认</b><span>原始内核事件、进程身份、父子关系、完整命令、目标地址、文件操作</span></div>
+        <div class="confidence inferred"><b>关联推断</b><span>文件读取与后续上报连接之间的时间关系</span></div>
+        <div class="confidence unknown"><b>当前未知</b><span>TLS 加密后的具体上报字段和值</span></div>
+      </article>
+    </section>
+  </main>
+
+  <footer><span>AgentReins · Evidence, not guesses.</span><span id="refresh-note">实时流：仅认证秘密自动遮盖</span></footer>
+  <script src="/agentsec/agentsec.js?v=20260915-2" defer></script>
+  <script src="/analytics.js" defer></script>
+</body>
+</html>

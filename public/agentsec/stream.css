@@ -1,0 +1,9 @@
+.command.event{display:block;padding:0}
+.command.event summary{display:grid;grid-template-columns:150px 1fr auto;gap:12px;padding:13px;cursor:pointer;list-style:none}
+.command.event summary::-webkit-details-marker{display:none}
+.command.event small{display:block;color:#66859a;font:9px/1.5 ui-monospace;margin-top:6px}
+.command.event pre{margin:0;padding:16px;border-top:1px solid #17384f;background:#040d15;color:#9fc2d8;font:10px/1.55 ui-monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto}
+.command.event.control-plane{border-left:2px solid var(--amber)}
+.command.event.kernel{border-left:2px solid var(--cyan)}
+.case-panel{margin-top:12px}.case-panel .command-list{max-height:680px}.command.event.tls-plaintext{border-left:2px solid var(--green)}
+@media(max-width:720px){.command.event summary{grid-template-columns:78px 1fr}.command.event summary .badge{display:none}}

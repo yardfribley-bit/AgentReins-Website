@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-15 11:18 CST",
+  "live": false,
+  "host": {
+    "hostname": "VM-0-11-ubuntu",
+    "provider": "Tencent Cloud CVM",
+    "os": "Ubuntu 22.04.5 LTS",
+    "kernel": "Linux 5.15.0-181",
+    "rootDiskPercent": 100
+  },
+  "sensor": {"status":"Healthy","lsm":"BPF-LSM","mode":"AUDIT ONLY","coveragePercent":92},
+  "metrics": {"execEvents":361,"networkEvents":9234},
+  "agents": [
+    {"name":"TAT Agent","status":"running","pid":832,"executable":"/usr/local/qcloud/tat_agent/tat_agent","events":1430,"privilege":"root"},
+    {"name":"Stargate","status":"running","pid":1871,"executable":"/usr/local/qcloud/stargate/bin/sgagent64","events":239,"privilege":"root"},
+    {"name":"YunJing Live","status":"running","pid":1905,"executable":"/usr/local/qcloud/YunJing/YDLive/YDLive","events":89,"privilege":"root"},
+    {"name":"YunJing Service","status":"running","pid":1914,"executable":"/usr/local/qcloud/YunJing/YDEyes/YDService","events":8574,"privilege":"root"},
+    {"name":"Barad Monitor","status":"running","pid":"1955/1962/1963","executable":"/usr/local/qcloud/monitor/python26/bin/python","events":30996,"privilege":"root"}
+  ],
+  "commands": [
+    {"time":"08-30 11:02","parent":"Tencent TAT control plane","process":"tat_agent","command":"收到远程 SHELL 任务 → 以 root 执行 → SUCCESS / exit 0（命令正文已脱敏）"},
+    {"time":"10:49:53","parent":"YDService","process":"iptables","command":"/sbin/iptables -nvL YJ-FIREWALL-INPUT"},
+    {"time":"10:49:53","parent":"YDService","process":"iptables","command":"/sbin/iptables -Z YJ-FIREWALL-INPUT"},
+    {"time":"10:47:04","parent":"YDService","process":"iptables","command":"/sbin/iptables -t filter -I INPUT 1 -j YJ-FIREWALL-INPUT --wait 10"},
+    {"time":"10:47:04","parent":"YDService","process":"iptables","command":"/sbin/iptables -t filter -A YJ-FIREWALL-INPUT -s [redacted] -j REJECT --wait 10"},
+    {"time":"10:46:48","parent":"sgagent64","process":"dash","command":"/bin/sh -c ../../monitor/barad/admin/trystart.sh"},
+    {"time":"10:44:48","parent":"YDLive","process":"YDService","command":"/usr/local/qcloud/YunJing/YDEyes/YDService -verNum"}
+  ],
+  "network": [
+    {"process":"TAT Agent","destination":"169.254.0.138:8186","evidence":"TCP · established"},
+    {"process":"YDService","destination":"169.254.0.55:5574","evidence":"TCP · established"},
+    {"process":"Barad Monitor","destination":"169.254.0.4:80","evidence":"TCP connect · high frequency"},
+    {"process":"Stargate","destination":"169.254.0.15:80","evidence":"TCP connect · confirmed"}
+  ],
+  "findings": [
+    "TAT 已确认能够接收并以 root 执行远程 Shell 任务",
+    "YDService 已确认接收文件、进程、DNS 与防火墙动态策略",
+    "所有 Tencent Agent 均以 root 和完整 capabilities 运行",
+    "YDService 可动态修改主机 iptables 防火墙规则",
+    "Barad Monitor 产生高频文件与网络事件",
+    "根分区容量已达到危险阈值",
+    "当前无法确认 TLS 上报正文"
+  ]
+}

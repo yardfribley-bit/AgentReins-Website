@@ -7,6 +7,8 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/agentreins-web
 Environment=AGENTREINS_ANALYTICS_DB=/var/lib/agentreins-web/analytics.sqlite3
+Environment=AGENTREINS_AGENTSEC_STATUS=/var/lib/agentreins-web/agentsec-status.json
+EnvironmentFile=-/etc/agentreins-web.env
 ExecStart=/usr/bin/python3 /opt/agentreins-web/server.py
 Restart=on-failure
 RestartSec=3

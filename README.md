@@ -17,6 +17,22 @@ python3 server.py
 
 Serve `public/` with any static server and run `server.py` on port 8787 for visit collection.
 
+## Linux Security Intelligence
+
+The public, redacted Tencent Cloud host dashboard is available at `/agentsec/`.
+It loads `/api/agentsec/status` every 30 seconds and falls back to the bundled
+`public/agentsec/snapshot.json` when a live snapshot has not been published.
+
+The production backend reads the live snapshot from:
+
+```text
+/var/lib/agentreins-web/agentsec-status.json
+```
+
+Only schema version 1 JSON up to 512 KiB is served. Raw KubeArmor events, secret
+values, full report bodies, credentials, and unredacted attacker addresses must
+not be published to this file.
+
 ## Analytics
 
 Visit events are stored in SQLite with a 30-day raw-data retention policy. The schema records time, IP address, page, referrer, user agent, device class, operating system, browser, screen size, and language. It deliberately does not collect cookies or page input.

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-import ipaddress, json, os, re, sqlite3, threading, urllib.parse, urllib.request
+import hashlib, hmac, ipaddress, json, os, re, sqlite3, threading, urllib.parse, urllib.request
 from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.join(os.path.dirname(__file__), "public")
 DB = os.environ.get("AGENTREINS_ANALYTICS_DB", "/var/lib/agentreins-web/analytics.sqlite3")
+AGENTSEC_STATUS = os.environ.get("AGENTREINS_AGENTSEC_STATUS", "/var/lib/agentreins-web/agentsec-status.json")
+AGENTSEC_FALLBACK = os.path.join(ROOT, "agentsec", "snapshot.json")
+AGENTSEC_INGEST_TOKEN = os.environ.get("AGENTREINS_AGENTSEC_INGEST_TOKEN", "")
 
 def db():
     conn = sqlite3.connect(DB)
@@ -20,6 +23,13 @@ def db():
     conn.execute("""CREATE TABLE IF NOT EXISTS behavior_events(id INTEGER PRIMARY KEY, occurred_at TEXT NOT NULL,
       ip TEXT NOT NULL, visitor_id TEXT, session_id TEXT, event_name TEXT NOT NULL, event_value TEXT,
       path TEXT, referrer TEXT, user_agent TEXT)""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS agentsec_events(
+      id INTEGER PRIMARY KEY, event_key TEXT NOT NULL UNIQUE, occurred_at TEXT NOT NULL,
+      received_at TEXT NOT NULL, component TEXT NOT NULL, category TEXT NOT NULL,
+      operation TEXT, process TEXT, parent_process TEXT, pid INTEGER, ppid INTEGER,
+      resource TEXT, data TEXT, result TEXT, task_id TEXT, source TEXT,
+      evidence TEXT NOT NULL)""")
+    conn.execute("CREATE INDEX IF NOT EXISTS agentsec_events_time ON agentsec_events(occurred_at DESC, id DESC)")
     for table, column in (("visits", "visitor_id TEXT"), ("visits", "session_id TEXT"),
                           ("downloads", "visitor_id TEXT"), ("downloads", "session_id TEXT")):
         name = column.split()[0]
@@ -123,6 +133,50 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlsplit(self.path)
         path = parsed.path
+        if path == "/api/agentsec/status":
+            source = AGENTSEC_STATUS if os.path.isfile(AGENTSEC_STATUS) else AGENTSEC_FALLBACK
+            try:
+                with open(source, "rb") as handle:
+                    data = handle.read(512 * 1024 + 1)
+                if len(data) > 512 * 1024:
+                    raise ValueError("agentsec status exceeds size limit")
+                payload = json.loads(data)
+                if payload.get("schemaVersion") != 1:
+                    raise ValueError("unsupported agentsec schema")
+                data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(data)
+            except (OSError, ValueError, json.JSONDecodeError):
+                self.send_error(503, "Security status unavailable")
+            return
+        if path == "/api/agentsec/events":
+            query = urllib.parse.parse_qs(parsed.query)
+            try: after = max(0, int((query.get("after") or ["0"])[0]))
+            except ValueError: after = 0
+            try: limit = min(500, max(1, int((query.get("limit") or ["200"])[0])))
+            except ValueError: limit = 200
+            task_id = str((query.get("taskId") or [""])[0])[:128]
+            component = str((query.get("component") or [""])[0])[:64]
+            clauses, params = ["id>?"], [after]
+            if task_id: clauses.append("task_id=?"); params.append(task_id)
+            if component: clauses.append("component=?"); params.append(component)
+            params.append(limit)
+            with db() as conn:
+                rows = conn.execute("""SELECT id,occurred_at,received_at,component,category,operation,
+                  process,parent_process,pid,ppid,resource,data,result,task_id,source,evidence
+                  FROM agentsec_events WHERE """ + " AND ".join(clauses) + " ORDER BY id DESC LIMIT ?", params).fetchall()
+            keys = ["id","time","receivedAt","component","category","operation","process","parentProcess",
+                    "pid","ppid","resource","data","result","taskId","source","evidence"]
+            items = [dict(zip(keys, row)) for row in rows]
+            payload = json.dumps({"events":items,"latestId":max([after]+[x["id"] for x in items]),
+                                  "serverTime":datetime.now(timezone.utc).isoformat()}, ensure_ascii=False).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers(); self.wfile.write(payload); return
         if path in ("/download/apple-silicon", "/download/intel"):
             architecture = "Apple Silicon" if path.endswith("apple-silicon") else "Intel"
             query = urllib.parse.parse_qs(parsed.query)
@@ -225,6 +279,37 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urllib.parse.urlsplit(self.path).path
+        if path == "/api/agentsec/ingest":
+            supplied = self.headers.get("authorization", "")
+            expected = "Bearer " + AGENTSEC_INGEST_TOKEN
+            if not AGENTSEC_INGEST_TOKEN or not hmac.compare_digest(supplied, expected):
+                self.send_error(401); return
+            try:
+                length = int(self.headers.get("content-length", "0"))
+                if length < 2 or length > 1024 * 1024: raise ValueError("invalid body size")
+                body = json.loads(self.rfile.read(length))
+                events = body.get("events") if isinstance(body, dict) else None
+                if not isinstance(events, list) or len(events) > 500: raise ValueError("invalid event batch")
+                now = datetime.now(timezone.utc).isoformat()
+                with db() as conn:
+                    for event in events:
+                        if not isinstance(event, dict): continue
+                        evidence = json.dumps(event.get("evidence") or event, ensure_ascii=False, separators=(",", ":"))[:131072]
+                        event_key = str(event.get("eventKey") or hashlib.sha256(evidence.encode()).hexdigest())[:128]
+                        values = (event_key, str(event.get("time") or now)[:64], now,
+                                  str(event.get("component") or "Unknown")[:64], str(event.get("category") or "runtime")[:32],
+                                  str(event.get("operation") or "")[:64], str(event.get("process") or "")[:2048],
+                                  str(event.get("parentProcess") or "")[:2048], int(event.get("pid") or 0), int(event.get("ppid") or 0),
+                                  str(event.get("resource") or "")[:32768], str(event.get("data") or "")[:131072],
+                                  str(event.get("result") or "")[:64], str(event.get("taskId") or "")[:128],
+                                  str(event.get("source") or "")[:2048], evidence)
+                        conn.execute("""INSERT OR IGNORE INTO agentsec_events(event_key,occurred_at,received_at,component,category,
+                          operation,process,parent_process,pid,ppid,resource,data,result,task_id,source,evidence)
+                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", values)
+                    conn.execute("DELETE FROM agentsec_events WHERE received_at < ?", ((datetime.now(timezone.utc)-timedelta(days=30)).isoformat(),))
+                self.send_response(202); self.end_headers()
+            except (ValueError, TypeError, json.JSONDecodeError): self.send_error(400)
+            return
         if path not in ("/api/visit", "/api/event"): return self.send_error(404)
         try:
             length = min(int(self.headers.get("content-length", "0")), 4096)
